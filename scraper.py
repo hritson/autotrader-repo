@@ -62,14 +62,11 @@ except Exception as e:
 
 def extract_ad_info(ad):
     try:
-        model = ad.find_element(By.XPATH, ".//a[@data-testid='search-listing-title']").text
-        specs = ad.find_element(By.XPATH, ".//ul[@data-testid='search-listing-specs']").text
-        price = ad.find_element(By.XPATH, ".//*[contains(text(), '£')]").text
-        location = ad.find_element(By.XPATH, ".//p[@data-testid='search-listing-seller']").text
-        return model, specs, price, location
+        info = ad.find_element(By.XPATH, ".//div[@data-testid='advertCard']").text
+        return info
     except NoSuchElementException:
         #print("Error")
-        return None, None, None, None
+        return None
 
 def string_to_year(year_string):
     try:
@@ -85,7 +82,7 @@ car_info = {key: [] for key in keyList}
 c = 0
 
 
-for _ in range(0, 50):
+for _ in range(0, 5):
     
     results = driver.find_element(By.XPATH, "//ul[@data-testid='desktop-search']")
     ad_listings = results.find_elements(By.XPATH, "./*/section")
@@ -93,14 +90,14 @@ for _ in range(0, 50):
     for ad in ad_listings:
         span_elements = ad.find_elements(By.XPATH, "./span")
         if not span_elements:  # Check if there are no <span> child elements
-            model, specs, price, location = extract_ad_info(ad)
-            if model and specs and price and location:
-                car_info["Make"].append(model.split(" ")[0])
-                car_info["Model"].append(' '.join(model.split(" ")[1:]))
-                car_info["Price"].append(price.split(" ")[0].replace('£', ''))
-                car_info["Year"].append(string_to_year(re.findall(r"\d{4}", specs)[0]))
-                car_info["Mileage"].append(int(re.findall(r"([\d,]+)\s+miles", specs)[0].replace(',', '')))
-                car_info["Location"].append(re.findall(r"ocation\s*(.*)", location)[0])
+            info = extract_ad_info(ad)
+            if info:
+                car_info["Make"].append(info.split('\n')[info.split('\n').index('Save') + 1].split(" ")[0])
+                car_info["Model"].append(' '.join(info.split('\n')[info.split('\n').index('Save') + 1].split(" ")[1:]))
+                car_info["Price"].append(re.findall(r'£(\d+(?:,\d+)?)', info)[0])
+                car_info["Year"].append(string_to_year(re.search(r'\b(\d{4}) \((.*?) reg\)', info).group(1)))
+                car_info["Mileage"].append(int(re.findall(r"([\d,]+)\s+miles", info)[0].replace(',', '')))
+                car_info["Location"].append(re.search(r"ocation\s*(.*)", info).group(1))
                 c+=1
         else:
             print("promotion skipped")
@@ -113,10 +110,10 @@ car_info["Price"] = [int(price.replace(',', '')) if "," in price else int(price)
 df = pd.DataFrame(car_info)
 print(df)
 
-df.to_csv('car_market.csv', index=False)
+#df.to_csv('car_market.csv', index=False)
 
-#driver.close()
+driver.close()
 
 end_time = time.time()
 runtime = end_time - start_time
-print("Runtime:", round(runtime, 2), "seconds")
+print("Runtime:", round(runtime, 2), "seconds") #50.5 secs to scrape 5 pages
